@@ -1,21 +1,50 @@
 <script>
-    import {onMount} from 'svelte'
-    import {FilmStore} from '../../film-store'
+    import { goto } from '$app/navigation';
+    import { onMount } from 'svelte';
+    import { FilmStore } from '../../film-store';
 
-    let handleClick = () => FilmStore.update(prev => {
-        let newFilm = {id: 3, name: 'Drive', director: 'Nicolas Winding Refn'}
-        return [...prev, newFilm]
-    })
-    
+    let handleClick = () => {
+        goto('/films/add/');
+    }
+
     onMount(async () => {
-        if(!$FilmStore.length){
-            const endpoint = 'http://localhost:8000/api/films/'
-            let response = await fetch(endpoint)
-            let data = await response.json()
-            FilmStore.set(data)
+        // Check if store is empty
+        let films;
+        FilmStore.subscribe(value => films = value)();
+        if (films.length === 0) {
+            const endpoint = 'http://localhost:8000/api/films/';
+            try {
+                let response = await fetch(endpoint);
+                if (response.ok) {
+                    let data = await response.json();
+                    FilmStore.set(data);
+                } else {
+                    console.error('Failed to fetch films');
+                }
+            } catch (error) {
+                console.error('Error fetching films:', error);
+            }
         }
-    })
+    });
 
+    async function handleDelete(id) {
+        // Check if store has items before attempting to delete
+        let films;
+        FilmStore.subscribe(value => films = value)();
+        if (films.length > 0) {
+            const endpoint = `http://localhost:8000/api/films/${id}/`;
+            try {
+                let response = await fetch(endpoint, { method: 'DELETE' });
+                if (response.ok) {
+                    FilmStore.update(prev => prev.filter(film => film.id !== id));
+                } else {
+                    console.error('Failed to delete film');
+                }
+            } catch (error) {
+                console.error('Error deleting film:', error);
+            }
+        }
+    }
 </script>
 
 <div>
@@ -30,15 +59,16 @@
                     src="{film.image}" 
                     alt="Film">
                 <div class="card-body d-flex flex-column justify-content-between gap-4">
-					<div>
+                    <div>
                         <h5 class="card-title">{ film.name }</h5>
                         <p class="card-text">Directed by { film.director }</p>
                     </div>
                     <div>
                         <a href="/films/{film.id}" class="btn btn-primary">View</a>
-					</div>
+                        <button on:click={() => handleDelete(film.id)} class="btn btn-danger mx-2">Delete</button>   
+                    </div>
                 </div>
-              </div>
+            </div>
 
         </div>
         {/each}
